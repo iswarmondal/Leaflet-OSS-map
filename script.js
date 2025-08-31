@@ -41,29 +41,33 @@ map.addControl(drawControl);
 
 map.on(L.Draw.Event.CREATED, function (event) {
     const layer = event.layer;
+    const type = event.layerType;
     drawnItems.addLayer(layer);
 
-    let output;
+    let output = { type: type };
 
-    if (layer instanceof L.Rectangle || layer instanceof L.Polygon || layer instanceof L.Polyline) {
-        const latLngs = layer.getLatLngs();
-        const coordinates = (layer instanceof L.Polyline ? latLngs : latLngs[0]).map(latLng => ({
+    if (type === 'rectangle' || type === 'polygon') {
+        const latLngs = layer.getLatLngs()[0];
+        output.coordinates = latLngs.map(latLng => ({
             lat: latLng.lat,
             lng: latLng.lng
         }));
-        output = { type: event.layerType, coordinates: coordinates };
-    } else if (layer instanceof L.Circle) {
+    } else if (type === 'polyline') {
+        const latLngs = layer.getLatLngs();
+        output.coordinates = latLngs.map(latLng => ({
+            lat: latLng.lat,
+            lng: latLng.lng
+        }));
+    } else if (type === 'circle') {
         const latLng = layer.getLatLng();
-        const radius = layer.getRadius();
-        output = { type: event.layerType, center: { lat: latLng.lat, lng: latLng.lng }, radius: radius };
-    } else if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
+        output.center = { lat: latLng.lat, lng: latLng.lng };
+        output.radius = layer.getRadius();
+    } else if (type === 'marker' || type === 'circlemarker') {
         const latLng = layer.getLatLng();
-        output = { type: event.layerType, coordinates: { lat: latLng.lat, lng: latLng.lng } };
+        output.coordinates = { lat: latLng.lat, lng: latLng.lng };
     }
 
-    if (output) {
-        document.getElementById('coordinates').textContent = JSON.stringify(output, null, 2);
-    }
+    document.getElementById('coordinates').textContent = JSON.stringify(output, null, 2);
 });
 
 const mousePositionContainer = document.getElementById('mouse-position-container');
