@@ -1,11 +1,28 @@
 const map = L.map('map').setView([51.505, -0.09], 13);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
+});
+
+const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+	attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+});
+
+osm.addTo(map);
+
+const baseMaps = {
+    "Street Map": osm,
+    "Satellite": satellite
+};
 
 const drawnItems = new L.FeatureGroup();
 map.addLayer(drawnItems);
+
+const overlayMaps = {
+    "Drawn Shapes": drawnItems
+};
+
+L.control.layers(baseMaps, overlayMaps).addTo(map);
 
 const drawControl = new L.Control.Draw({
     edit: {
@@ -13,10 +30,10 @@ const drawControl = new L.Control.Draw({
     },
     draw: {
         polygon: true,
-        polyline: false,
-        circle: false,
-        marker: false,
-        circlemarker: false,
+        polyline: true,
+        circle: true,
+        marker: true,
+        circlemarker: true,
         rectangle: true
     }
 });
@@ -26,16 +43,33 @@ map.on(L.Draw.Event.CREATED, function (event) {
     const layer = event.layer;
     drawnItems.addLayer(layer);
 
-    let coordinates;
-    if (layer instanceof L.Rectangle || layer instanceof L.Polygon) {
-        const latLngs = layer.getLatLngs()[0];
-        coordinates = latLngs.map(latLng => ({
+    let output;
+
+    if (layer instanceof L.Rectangle || layer instanceof L.Polygon || layer instanceof L.Polyline) {
+        const latLngs = layer.getLatLngs();
+        const coordinates = (layer instanceof L.Polyline ? latLngs : latLngs[0]).map(latLng => ({
             lat: latLng.lat,
             lng: latLng.lng
         }));
+        output = { type: event.layerType, coordinates: coordinates };
+    } else if (layer instanceof L.Circle) {
+        const latLng = layer.getLatLng();
+        const radius = layer.getRadius();
+        output = { type: event.layerType, center: { lat: latLng.lat, lng: latLng.lng }, radius: radius };
+    } else if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
+        const latLng = layer.getLatLng();
+        output = { type: event.layerType, coordinates: { lat: latLng.lat, lng: latLng.lng } };
     }
 
-    if (coordinates) {
-        document.getElementById('coordinates').textContent = JSON.stringify(coordinates, null, 2);
+    if (output) {
+        document.getElementById('coordinates').textContent = JSON.stringify(output, null, 2);
     }
+});
+
+const mousePositionContainer = document.getElementById('mouse-position-container');
+
+map.on('mousemove', function(e) {
+    const lat = e.latlng.lat.toFixed(5);
+    const lng = e.latlng.lng.toFixed(5);
+    mousePositionContainer.textContent = `Lat: ${lat}, Lng: ${lng}`;
 });

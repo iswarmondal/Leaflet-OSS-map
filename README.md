@@ -1,19 +1,23 @@
 # Leaflet Drawing App
 
-This is a simple web application that allows users to draw rectangles and polygons on a map and view the coordinates of the drawn shapes.
+This is a simple web application that demonstrates several features of the Leaflet.js mapping library.
 
 ## Features
 
-- Interactive map powered by Leaflet.js and OpenStreetMap.
-- Draw rectangles and polygons on the map.
-- Displays the geographical coordinates (latitude and longitude) of the vertices of the drawn shapes.
-- Lightweight and uses CDNs for libraries, so no installation is needed.
+- **Interactive Map:** Powered by Leaflet.js.
+- **Basemap Switcher:** Switch between a street map and a satellite imagery layer.
+- **Full Drawing Tools:** Draw Polygons, Polylines, Rectangles, Circles, and place Markers.
+- **Shape Properties Display:** Shows the properties of drawn shapes (coordinates, center, radius, etc.).
+- **Mouse Coordinate Inspector:** Displays the real-time geographic coordinates of the mouse pointer.
+- **Lightweight:** Uses CDNs for libraries, so no installation is needed.
 
 ## How to Use
 
 1.  Simply open the `index.html` file in your web browser.
-2.  Use the drawing tools on the top-left side of the map to draw a rectangle or a polygon.
-3.  The coordinates of the shape will be displayed in the bottom-left corner of the page.
+2.  Use the layer control in the top-right to switch basemaps.
+3.  Use the drawing tools on the top-left to draw a shape.
+4.  The properties of the drawn shape will be displayed in the bottom-left corner.
+5.  The current mouse coordinates are shown in the top-right corner.
 
 ## File Structure
 
@@ -23,87 +27,67 @@ This is a simple web application that allows users to draw rectangles and polygo
 
 ## JavaScript Code (`script.js`) Explanation
 
-The `script.js` file contains all the logic for interacting with the Leaflet library to create the map and handle drawing functionality.
+The `script.js` file contains all the logic for interacting with the Leaflet library.
 
-### 1. Map Initialization
+### 1. Map and Basemap Initialization
 
 ```javascript
 const map = L.map('map').setView([51.505, -0.09], 13);
+
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { ... });
+
+const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { ... });
+
+osm.addTo(map);
+
+const baseMaps = {
+    "Street Map": osm,
+    "Satellite": satellite
+};
 ```
 
--   `L.map('map')`: This creates a map object and attaches it to the `div` element with the `id="map"` in `index.html`.
--   `.setView([51.505, -0.09], 13)`: This sets the initial geographical center of the map (latitude 51.505, longitude -0.09) and the initial zoom level (13).
+-   The map is initialized as before.
+-   Two separate `L.tileLayer` instances are created: `osm` for the street map and `satellite` for the imagery layer.
+-   The `osm` layer is added to the map by default.
+-   A `baseMaps` object is created to hold the different basemap layers with user-friendly names.
 
-### 2. Tile Layer
-
-```javascript
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
-```
-
--   This adds the visual map tiles to our map. We are using the free tiles from [OpenStreetMap](https://www.openstreetmap.org/).
--   The `attribution` option adds the necessary credit to OpenStreetMap in the bottom-right corner of the map.
-
-### 3. Feature Group for Drawn Items
+### 2. Layer Control
 
 ```javascript
 const drawnItems = new L.FeatureGroup();
 map.addLayer(drawnItems);
+
+const overlayMaps = {
+    "Drawn Shapes": drawnItems
+};
+
+L.control.layers(baseMaps, overlayMaps).addTo(map);
 ```
 
--   `L.FeatureGroup()`: This creates a layer group to which we will add the shapes (rectangles and polygons) that users draw.
--   `map.addLayer(drawnItems)`: This adds the feature group to the map, making it ready to hold the drawn layers.
+-   `L.FeatureGroup()` creates a layer to hold all the user-drawn shapes.
+-   This group is then put into an `overlayMaps` object. Overlays are layers that can be toggled on and off over the basemap.
+-   `L.control.layers(baseMaps, overlayMaps)` creates the layer switcher control. It takes the `baseMaps` (which are radio buttons) and `overlayMaps` (which are checkboxes) and adds the control to the map.
 
-### 4. Drawing Controls
+### 3. Drawing Controls
 
-```javascript
-const drawControl = new L.Control.Draw({
-    edit: {
-        featureGroup: drawnItems
-    },
-    draw: {
-        polygon: true,
-        polyline: false,
-        circle: false,
-        marker: false,
-        circlemarker: false,
-        rectangle: true
-    }
-});
-map.addControl(drawControl);
-```
+This section adds the `leaflet-draw` toolbar and configures it to show all drawing tools.
 
--   This code adds the `leaflet-draw` toolbar to the map.
--   `edit: { featureGroup: drawnItems }`: This tells the draw control that any shapes in the `drawnItems` layer group should be editable.
--   `draw: { ... }`: This configuration object specifies which drawing tools to show in the toolbar. We have enabled `polygon` and `rectangle` and disabled the others.
+### 4. Handling Drawing Events
 
-### 5. Handling the 'draw:created' Event
+This section listens for the `draw:created` event and extracts the relevant properties (coordinates, radius, etc.) from the newly drawn shape to display them.
+
+### 5. Mouse Position Inspector
 
 ```javascript
-map.on(L.Draw.Event.CREATED, function (event) {
-    const layer = event.layer;
-    drawnItems.addLayer(layer);
+const mousePositionContainer = document.getElementById('mouse-position-container');
 
-    let coordinates;
-    if (layer instanceof L.Rectangle || layer instanceof L.Polygon) {
-        const latLngs = layer.getLatLngs()[0];
-        coordinates = latLngs.map(latLng => ({
-            lat: latLng.lat,
-            lng: latLng.lng
-        }));
-    }
-
-    if (coordinates) {
-        document.getElementById('coordinates').textContent = JSON.stringify(coordinates, null, 2);
-    }
+map.on('mousemove', function(e) {
+    const lat = e.latlng.lat.toFixed(5);
+    const lng = e.latlng.lng.toFixed(5);
+    mousePositionContainer.textContent = `Lat: ${lat}, Lng: ${lng}`;
 });
 ```
 
--   `map.on(L.Draw.Event.CREATED, ...)`: This sets up an event listener that fires whenever a new shape is created using the draw toolbar.
--   `const layer = event.layer;`: The created shape is passed as a `layer` in the event object.
--   `drawnItems.addLayer(layer);`: The new shape is added to our `drawnItems` feature group.
--   The code then checks if the created layer is a `Rectangle` or a `Polygon`.
--   `layer.getLatLngs()[0]`: This method retrieves the geographical coordinates of the vertices of the shape.
--   The coordinates are then formatted into an array of objects.
--   Finally, `document.getElementById('coordinates').textContent = ...`: The formatted coordinates are converted to a JSON string and displayed in the `<pre>` element on the page.
+-   This code listens for the `mousemove` event on the map.
+-   Whenever the mouse moves, it gets the geographic coordinates from the event object.
+-   The latitude and longitude are formatted and displayed in the `mouse-position-container` div.
